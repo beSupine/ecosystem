@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sfq.ecosystem.repository.TrainingDataMapper">
+    <!-- 定义一个可复用的结果映射, 方便 findLatest 方法使用 -->
+    <resultMap id="TrainingDataResultMap" type="com.sfq.ecosystem.entity.TrainingData">
+        <id property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="entryTime" column="entry_time"/>
+        <!-- 协同子系统字段 -->
+        <result property="x" column="X"/><result property="xV" column="X_V"/><result property="xO" column="X_O"/><result property="xR" column="X_R"/><result property="xS" column="X_S"/>
+        <result property="xV1" column="X_V1"/><result property="xV2" column="X_V2"/><result property="xO1" column="X_O1"/><result property="xO2" column="X_O2"/><result property="xO3" column="X_O3"/><result property="xR1" column="X_R1"/><result property="xS1" column="X_S1"/>
+        <result property="xV11" column="X_V11"/><result property="xV12" column="X_V12"/><result property="xV13" column="X_V13"/><result property="xV14" column="X_V14"/><result property="xV21" column="X_V21"/><result property="xV22" column="X_V22"/>
+        <result property="xO11" column="X_O11"/><result property="xO21" column="X_O21"/><result property="xO31" column="X_O31"/><result property="xO32" column="X_O32"/>
+        <result property="xR11" column="X_R11"/><result property="xR12" column="X_R12"/><result property="xR13" column="X_R13"/>
+        <result property="xS11" column="X_S11"/>
+        <!-- 资源子系统字段 -->
+        <result property="z" column="Z"/><result property="zV" column="Z_V"/><result property="zO" column="Z_O"/><result property="zS" column="Z_S"/>
+        <result property="zV1" column="Z_V1"/><result property="zV2" column="Z_V2"/><result property="zV3" column="Z_V3"/><result property="zO1" column="Z_O1"/><result property="zO2" column="Z_O2"/><result property="zO3" column="Z_O3"/><result property="zS1" column="Z_S1"/>
+        <result property="zV11" column="Z_V11"/><result property="zV12" column="Z_V12"/><result property="zV21" column="Z_V21"/><result property="zV22" column="Z_V22"/><result property="zV31" column="Z_V31"/><result property="zV32" column="Z_V32"/>
+        <result property="zO11" column="Z_O11"/><result property="zO21" column="Z_O21"/><result property="zO31" column="Z_O31"/><result property="zO32" column="Z_O32"/>
+        <result property="zS11" column="Z_S11"/>
+        <!-- 服务子系统字段 -->
+        <result property="f" column="F"/><result property="fV" column="F_V"/><result property="fO" column="F_O"/><result property="fR" column="F_R"/><result property="fS" column="F_S"/>
+        <result property="fV1" column="F_V1"/><result property="fV2" column="F_V2"/><result property="fV3" column="F_V3"/><result property="fO1" column="F_O1"/><result property="fR1" column="F_R1"/><result property="fS1" column="F_S1"></result>
+        <result property="fV11" column="F_V11"/><result property="fV12" column="F_V12"/><result property="fV21" column="F_V21"/><result property="fV22" column="F_V22"/><result property="fV31" column="F_V31"/><result property="fV32" column="F_V32"/>
+        <result property="fO11" column="F_O11"/>
+        <result property="fR11" column="F_R11"/><result property="fR12" column="F_R12"/><result property="fR13" column="F_R13"/>
+        <result property="fS11" column="F_S11"/><result property="fS12" column="F_S12"/>
+    </resultMap>
+
+    <!-- *** INSERT 语句已更新, 包含了所有评价等级字段 *** -->
+    <insert id="insert" parameterType="com.sfq.ecosystem.entity.TrainingData" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO training_data (
+            entry_time,
+            X, X_V, X_O, X_R, X_S,
+            Z, Z_V, Z_O, Z_S,
+            F, F_V, F_O, F_R, F_S,
+            X_V11, X_V12, X_V13, X_V14, X_V21, X_V22, X_O11, X_O21, X_O31, X_O32, X_R11, X_R12, X_R13, X_S11,
+            Z_V11, Z_V12, Z_V21, Z_V22, Z_V31, Z_V32, Z_O11, Z_O21, Z_O31, Z_O32, Z_S11,
+            F_V11, F_V12, F_V21, F_V22, F_V31, F_V32, F_O11, F_R11, F_R12, F_R13, F_S11, F_S12
+        )
+        VALUES (
+                   #{entryTime},
+                   #{x}, #{xV}, #{xO}, #{xR}, #{xS},
+                   #{z}, #{zV}, #{zO}, #{zS},
+                   #{f}, #{fV}, #{fO}, #{fR}, #{fS},
+                   #{xV11}, #{xV12}, #{xV13}, #{xV14}, #{xV21}, #{xV22}, #{xO11}, #{xO21}, #{xO31}, #{xO32}, #{xR11}, #{xR12}, #{xR13}, #{xS11},
+                   #{zV11}, #{zV12}, #{zV21}, #{zV22}, #{zV31}, #{zV32}, #{zO11}, #{zO21}, #{zO31}, #{zO32}, #{zS11},
+                   #{fV11}, #{fV12}, #{fV21}, #{fV22}, #{fV31}, #{fV32}, #{fO11}, #{fR11}, #{fR12}, #{fR13}, #{fS11}, #{fS12}
+               )
+    </insert>
+
+    <!-- *** UPDATE 语句已更新, 包含了所有评价等级字段 *** -->
+    <update id="update" parameterType="com.sfq.ecosystem.entity.TrainingData">
+        UPDATE training_data
+        SET
+            X = #{x}, X_V = #{xV}, X_O = #{xO}, X_R = #{xR}, X_S = #{xS},
+            Z = #{z}, Z_V = #{zV}, Z_O = #{zO}, Z_S = #{zS},
+            F = #{f}, F_V = #{fV}, F_O = #{fO}, F_R = #{fR}, F_S = #{fS},
+            X_V11 = #{xV11}, X_V12 = #{xV12}, X_V13 = #{xV13}, X_V14 = #{xV14}, X_V21 = #{xV21}, X_V22 = #{xV22}, X_O11 = #{xO11}, X_O21 = #{xO21}, X_O31 = #{xO31}, X_O32 = #{xO32}, X_R11 = #{xR11}, X_R12 = #{xR12}, X_R13 = #{xR13}, X_S11 = #{xS11},
+            Z_V11 = #{zV11}, Z_V12 = #{zV12}, Z_V21 = #{zV21}, Z_V22 = #{zV22}, Z_V31 = #{zV31}, Z_V32 = #{zV32}, Z_O11 = #{zO11}, Z_O21 = #{zO21}, Z_O31 = #{zO31}, Z_O32 = #{zO32}, Z_S11 = #{zS11},
+            F_V11 = #{fV11}, F_V12 = #{fV12}, F_V21 = #{fV21}, F_V22 = #{fV22}, F_V31 = #{fV31}, F_V32 = #{fV32}, F_O11 = #{fO11}, F_R11 = #{fR11}, F_R12 = #{fR12}, F_R13 = #{fR13}, F_S11 = #{fS11}, F_S12 = #{fS12}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM training_data WHERE id = #{id}
+    </delete>
+
+    <select id="countByDateRange" resultType="long">
+        SELECT count(*) FROM training_data
+        WHERE entry_time BETWEEN #{startDate} AND #{endDate}
+    </select>
+
+    <select id="findByDateRange" resultType="com.sfq.ecosystem.dto.DateRangeQueryInfoDTO">
+        SELECT id, entry_time as entryTime FROM training_data
+        WHERE entry_time BETWEEN #{startDate} AND #{endDate}
+        ORDER BY entry_time DESC
+    </select>
+
+
+
+    <!-- *** 查询 *** -->
+    <select id="findLatest" resultMap="TrainingDataResultMap">
+        SELECT * FROM training_data ORDER BY entry_time DESC LIMIT 1;
+    </select>
+
+    <!-- 接口一: 获取综合评价 (单个最新) -->
+    <select id="findOverallEvaluation" resultType="java.util.Map">
+        SELECT
+            `X` as collaborativeSystemEvaluation,
+            `Z` as resourceSystemEvaluation,
+            `F` as serviceSystemEvaluation
+        FROM training_data
+        ORDER BY entry_time DESC
+            LIMIT 1;
+    </select>
+
+    <!-- 接口二: 获取雷达图数据 (单个最新) -->
+    <select id="findRadarChartData" resultType="java.util.Map">
+        SELECT
+            `X_V` as collaborative_vitality,
+            `X_O` as collaborative_organization,
+            `X_R` as collaborative_stability,
+            `X_S` as collaborative_service,
+            `Z_V` as resource_vitality,
+            `Z_O` as resource_organization,
+            `Z_S` as resource_service,
+            `F_V` as service_vitality,
+            `F_O` as service_organization,
+            `F_R` as service_stability,
+            `F_S` as service_service
+        FROM training_data
+        ORDER BY entry_time DESC
+            LIMIT 1;
+    </select>
+    <!-- *** 指标五年趋势 *** -->
+    <select id="findLatestFive" resultMap="TrainingDataResultMap">
+        SELECT * FROM training_data ORDER BY entry_time DESC LIMIT 5;
+    </select>
+
+    <!-- 接口三: 获取综合评价趋势 -->
+    <select id="findOverallEvaluationTrend" resultType="java.util.Map">
+        SELECT
+            `entry_time`,
+            `X` as collaborativeSystemEvaluation,
+            `Z` as resourceSystemEvaluation,
+            `F` as serviceSystemEvaluation
+        FROM training_data
+        ORDER BY entry_time DESC
+            LIMIT 5;
+    </select>
+
+    <!-- 接口四: 获取雷达图数据趋势 -->
+    <select id="findRadarDataTrend" resultType="java.util.Map">
+        SELECT
+            `entry_time`,
+            `X_V` as collaborative_vitality,
+            `X_O` as collaborative_organization,
+            `X_R` as collaborative_stability,
+            `X_S` as collaborative_service,
+            `Z_V` as resource_vitality,
+            `Z_O` as resource_organization,
+            `Z_S` as resource_service,
+            `F_V` as service_vitality,
+            `F_O` as service_organization,
+            `F_R` as service_stability,
+            `F_S` as service_service
+        FROM training_data
+        ORDER BY entry_time DESC
+            LIMIT 5;
+    </select>
+</mapper>

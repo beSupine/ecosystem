@@ -1,0 +1,74 @@
+{
+    "name": "产业链数字生态协同子系统总体评价",
+    "children": [
+        {
+            "name": "活力Xv",
+            "children": [
+                {
+                    "name": "生产力Xv1",
+                    "children": [
+                        { "name": "产出数量Xv11" },
+                        { "name": "产出效率Xv12" },
+                        { "name": "产出质量Xv13" },
+                        { "name": "产出效益Xv14" }
+                    ]
+                },
+                {
+                    "name": "流通力Xv2",
+                    "children": [
+                        { "name": "数据覆盖率Xv21" },
+                        { "name": "流动效率Xv22" }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "组织力Xo",
+            "children": [
+                {
+                    "name": "结构性Xo1",
+                    "children": [
+                        { "name": "企业分布密度Xo11" }
+                    ]
+                },
+                {
+                    "name": "多样性Xo2",
+                    "children": [
+                        { "name": "协同主体多样性Xo21" }
+                    ]
+                },
+                {
+                    "name": "互动性Xo3",
+                    "children": [
+                        { "name": "协同主体协作程度Xo31" },
+                        { "name": "协同主体竞争程度Xo32" }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "稳定性Xr",
+            "children": [
+                {
+                    "name": "抵抗力Xr1",
+                    "children": [
+                        { "name": "核心企业留存率Xr11" },
+                        { "name": "合作关系稳定性指数Xr12" },
+                        { "name": "价值链恢复效率Xr13" }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "服务能力Xs",
+            "children": [
+                {
+                    "name": "供给服务Xs1",
+                    "children": [
+                        { "name": "协同数据完整性Xs11" }
+                    ]
+                }
+            ]
+        }
+    ]
+}

@@ -1,105 +1,122 @@
 <script setup>
-import { reactive, ref } from 'vue';
-import { ElMessage } from 'element-plus';
-import synergyData from '../assets/SynergyIndex.json';
-import serviceData from '../assets/ServiceIndex.json';
-import resourceData from '../assets/ResourceIndex.json';
+import { reactive, ref, onMounted } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import apiClient from '../api';
 import Table from '../components/Table.vue';
 import DataInput from '../components/DataInput.vue';
+import dayjs from 'dayjs';
 
-const isDataInputVisible = ref(false);
-const selectedRow = ref(null);
-const isTableVisible = ref(false);
-const value1 = ref('');
-const filteredArchives = ref([]);
+// --- 组件状态 ---
+const isDataInputVisible = ref(false); // 控制新增/编辑表单的显示
+const isTableVisible = ref(false);     // 控制详情表格的显示
+const dateRange = ref('');             // 日期选择器的值
+const archives = ref([]);              // 表格显示的档案列表
+const selectedRecord = ref(null);      // 当前选中的记录（用于详情/编辑）
+const isEditMode = ref(false);         // 标记当前是新增还是编辑模式
 
-// const handleData = (data) => {
-//   return Object.entries(data.index).map(([key, value]) => ({ key, value: value[value.length - 1] }));
-// };
+// --- 数据获取与操作 ---
+// 获取档案列表
+const fetchArchives = async (startDate, endDate) => {
+  try {
+    // 如果没有提供日期，则默认查询一个非常大的范围来获取所有数据
+    const params = {
+      startDate: startDate ? dayjs(startDate).startOf('day').toISOString() : '1970-01-01T00:00:00',
+      endDate: endDate ? dayjs(endDate).endOf('day').toISOString() : '2999-12-31T23:59:59',
+    };
+    const response = await apiClient.get('/by-date-range', { params });
+    // 后端返回的数据是按时间倒序的，这里保持
+    archives.value = response.data.records.map(r => ({ ...r, date: dayjs(r.entryTime).format('YYYY-MM-DD HH:mm:ss') }));
+  } catch (error) {
+    ElMessage.error('获取档案列表失败');
+    console.error(error);
+  }
+};
 
-// console.log(handleData(synergyData))
-
-const archives = reactive([
-  { id: 1, date: '2023-10-01', title: '档案1' },
-  { id: 2, date: '2024-3-02', title: '档案2' },
-  { id: 3, date: '2024-11-12', title: '档案3' },
-  { id: 3, date: '2024-12-13', title: '档案4' },
-  { id: 3, date: '2024-1-03', title: '档案5' },
-  { id: 3, date: '2024-3-11', title: '档案6' },
-  { id: 3, date: '2024-5-22', title: '档案7' },
-  { id: 3, date: '2024-7-12', title: '档案9' },
-  { id: 3, date: '2025-2-03', title: '档案11' },
-  { id: 3, date: '2025-3-2', title: '档案13' },
-]);
+// 组件挂载时获取初始数据
+onMounted(() => {
+  fetchArchives();
+});
 
 // 查看详情
-const handleDetail = (row) => {
-  console.log('查看详情:', row);
-  selectedRow.value = row;
-  isTableVisible.value = true;
+const handleDetail = async (row) => {
+  try {
+    const response = await apiClient.get(`/${row.id}`);
+    selectedRecord.value = response.data;
+    isTableVisible.value = true;
+    isDataInputVisible.value = false; // 确保与新增/编辑表单互斥
+  } catch (error) {
+    ElMessage.error('获取档案详情失败');
+    console.error(error);
+  }
 };
 
 // 删除档案
 const handleDelete = (row) => {
-  ElMessage.warning(`删除档案: ${row.title}`);
-  // 在实际项目中，这里应该调用后端接口删除数据
-  const index = archives.indexOf(row);
-  if (index > -1) {
-    archives.splice(index, 1);
+  ElMessageBox.confirm(`确定要删除档案 (ID: ${row.id}) 吗?`, '警告', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning',
+  }).then(async () => {
+    try {
+      await apiClient.delete(`/${row.id}`);
+      ElMessage.success('删除成功');
+      fetchArchives(); // 重新加载列表
+    } catch (error) {
+      ElMessage.error('删除失败');
+      console.error(error);
+    }
+  }).catch(() => {
+    // 用户取消操作
+  });
+};
+
+// 点击新增按钮
+const handleAdd = () => {
+  isEditMode.value = false;
+  selectedRecord.value = null; // 清空旧数据
+  isDataInputVisible.value = true;
+  isTableVisible.value = false;
+};
+
+// 点击“修改”按钮（来自Table组件的事件）
+const handleEdit = async (id) => {
+  try {
+    const response = await apiClient.get(`/${id}`);
+    selectedRecord.value = response.data;
+    isEditMode.value = true;
+    isDataInputVisible.value = true;
+    isTableVisible.value = false;
+  } catch (error) {
+    ElMessage.error('加载待编辑数据失败');
   }
 };
 
-const handleAdd = () => {
-  isDataInputVisible.value = true;
-};
-
-// 新增：处理取消事件，返回到 Table
+// 处理取消事件，返回到 Table
 const handleCancel = () => {
   isDataInputVisible.value = false;
 };
 
-// 新增：根据日期范围筛选档案
+// 处理表单提交成功事件（来自DataInput组件）
+const handleSubmitSuccess = () => {
+  isDataInputVisible.value = false;
+  fetchArchives(); // 刷新列表
+};
+
+
+// 根据日期范围筛选档案
 const filterArchivesByDate = () => {
-  if (!value1.value || value1.value.length !== 2) {
+  if (!dateRange.value || dateRange.value.length !== 2) {
     ElMessage.warning('请选择完整的日期范围');
     return;
   }
-
-  const [startDate, endDate] = value1.value;
-  
-  if (!startDate || !endDate) {
-    ElMessage.warning('请选择完整的日期范围');
-    return;
-  }
-
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-
-  // 如果开始日期大于结束日期，交换它们
-  if (start > end) {
-    [start, end] = [end, start];
-  }
-
-  // 筛选日期范围内的档案
-  filteredArchives.value = archives.filter(archive => {
-    const archiveDate = new Date(archive.date);
-    return archiveDate >= start && archiveDate <= end;
-  });
-
-  // 显示筛选结果
-  console.log('筛选结果:', filteredArchives.value);
+  const [startDate, endDate] = dateRange.value;
+  fetchArchives(startDate, endDate);
 };
 
-// 新增：重置筛选条件并显示所有记录
+// 重置筛选条件并显示所有记录
 const resetFilter = () => {
-  value1.value = ''; // 清空日期选择器的值
-  filteredArchives.value = []; // 清空筛选结果
-};
-
-// 新增：在 archives 数组末尾添加一条新的记录
-const addArchiveRecord = (newRecord) => {
-  archives.push(newRecord);
-  ElMessage.success('新增记录成功');
+  dateRange.value = ''; // 清空日期选择器的值
+  fetchArchives(); // 重新获取所有数据
 };
 
 </script>
@@ -108,25 +125,25 @@ const addArchiveRecord = (newRecord) => {
   <div class="container" id="left">
     <el-container>
       <el-header class="button-field">
-        <el-row :gutter="60">
-          <el-col span="1">
+        <el-row :gutter="20" align="middle" style="width: 100%;">
+          <el-col :span="4">
             <el-button type="primary" @click="handleAdd">新增</el-button>
           </el-col>
-          <el-col span="10" offset="2">
-            <el-date-picker v-model="value1" type="daterange" range-separator="到" start-placeholder="开始日期"
-              end-placeholder="结束日期" :size="default" />
+          <el-col :span="14">
+            <el-date-picker v-model="dateRange" type="daterange" range-separator="到" start-placeholder="开始日期"
+                            end-placeholder="结束日期" style="width: 100%;"/>
           </el-col>
-          <el-col span="4" offset="2">
-            <el-button type="warning" @click="resetFilter">重置</el-button> <!-- 修改：点击重置按钮时调用 resetFilter 方法 -->
+          <el-col :span="6">
+            <el-button @click="resetFilter">重置</el-button>
             <el-button type="primary" @click="filterArchivesByDate">查询</el-button>
           </el-col>
         </el-row>
       </el-header>
       <el-main style="padding: 0;">
-        <el-table :data="filteredArchives.length > 0 ? filteredArchives : archives" class="table">
-          <el-table-column type="index" label="序号" width="100" />
-          <el-table-column prop="date" label="创建日期" width="280" />
-          <el-table-column prop="title" label="档案名" />
+        <el-table :data="archives" class="table">
+          <el-table-column type="index" label="序号" width="60" />
+          <el-table-column prop="id" label="ID" width="80" />
+          <el-table-column prop="date" label="创建日期" />
           <el-table-column label="操作" width="150">
             <template #default="scope">
               <el-button size="small" @click="handleDetail(scope.row)">详情</el-button>
@@ -138,16 +155,21 @@ const addArchiveRecord = (newRecord) => {
     </el-container>
   </div>
   <div class="container" id="right">
-    <component
-      :is="isDataInputVisible ? DataInput : (isTableVisible ? Table : null)"
-      v-if="!isDataInputVisible || (synergyData && serviceData && resourceData)"
-      :synergy-data="synergyData"
-      :service-data="serviceData"
-      :resource-data="resourceData"
-      :selected-row="selectedRow"
-      @cancel="handleCancel"
-      @submit-success="addArchiveRecord"
+    <DataInput
+        v-if="isDataInputVisible"
+        :is-edit="isEditMode"
+        :initial-data="selectedRecord"
+        @cancel="handleCancel"
+        @submit-success="handleSubmitSuccess"
     />
+    <Table
+        v-else-if="isTableVisible && selectedRecord"
+        :record-data="selectedRecord"
+        @edit="handleEdit"
+    />
+    <div v-else class="placeholder">
+      请在左侧选择一个档案查看详情，或点击“新增”按钮。
+    </div>
   </div>
   <div class="subtitle">
     档案管理
@@ -157,46 +179,26 @@ const addArchiveRecord = (newRecord) => {
 <style scoped>
 :deep(.table) {
   width: 100%;
-  /* 背景色设置为透明 */
   --el-table-bg-color: transparent;
   --el-table-header-bg-color: transparent;
   --el-table-tr-bg-color: transparent;
   --el-table-row-hover-bg-color: #4682b4;
 }
-
 #left {
-  position: absolute;
-  top: 13vh;
-  left: 2vw;
-  height: 75.5vh;
-  width: 35vw;
-  /* 添加模糊背景 */
-  backdrop-filter: blur(10px);
-  background-color: rgba(0, 0, 0, 0.2);
-  align-items: flex-start;
-  padding: 0;
+  position: absolute; top: 13vh; left: 2vw; height: 75.5vh; width: 35vw;
+  backdrop-filter: blur(10px); background-color: rgba(0, 0, 0, 0.2);
+  align-items: flex-start; padding: 0;
 }
-
 #right {
-  position: absolute;
-  top: 13vh;
-  left: 38.7vw;
-  height: 74vh;
-  width: 59vw;
-  /* 添加模糊背景 */
-  backdrop-filter: blur(10px);
-  background-color: rgba(0, 0, 0, 0.2);
-  padding-right: 20px;
+  position: absolute; top: 13vh; left: 38.7vw; height: 74vh; width: 59vw;
+  backdrop-filter: blur(10px); background-color: rgba(0, 0, 0, 0.2);
+  padding: 20px;
 }
-
 .button-field {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  padding: 5px;
+  width: 100%; display: flex; align-items: center; padding: 15px 10px; height: auto;
 }
-
-.el-row {
-  left: 10px;
+.placeholder {
+  color: #ccc; font-size: 16px; text-align: center;
+  display: flex; justify-content: center; align-items: center; height: 100%;
 }
 </style>

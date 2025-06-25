@@ -1,465 +1,260 @@
 <template>
-    <div id="body">
-        <div class="container" id="c1">
-            <div id="scoreChart"></div>
-            <div id="pieChart"></div>
-        </div>
-        <div class="container" id="c2">
-            <div id="radarChart"></div>
-            <div id="horizontalBarChart"></div>
-        </div>
-        <div class="container" id="c3">
-            <span>历年趋势</span>
-            <div id="smallBarChart1"></div>
-            <div id="smallBarChart2"></div>
-            <div id="smallBarChart3"></div>
-            <div id="smallBarChart4"></div>
-        </div>
-        <div class="container" id="c4">
-            <div id="treeChart"></div>
-            <div v-if="isPopupVisible" class="popup">
-                <div ref="barChartRef" style="width: 500px; height: 300px;"></div>
-                <button @click="closePopup">关闭</button>
-            </div>
-        </div>
-        <div class="subtitle">
-            服务子系统
-        </div>
+  <div id="body">
+    <div class="container" id="c1">
+      <div id="scoreChart"></div>
+      <div id="pieChart"></div>
     </div>
+    <div class="container" id="c2">
+      <div id="radarChart"></div>
+      <div id="horizontalBarChart"></div>
+    </div>
+    <div class="container" id="c3">
+      <span>历年趋势</span>
+      <div id="smallBarChart1"></div>
+      <div id="smallBarChart2"></div>
+      <div id="smallBarChart3"></div>
+      <div id="smallBarChart4"></div>
+    </div>
+    <div class="container" id="c4">
+      <div id="treeChart"></div>
+      <div v-if="isPopupVisible" class="popup">
+        <div ref="barChartRef" style="width: 500px; height: 300px;"></div>
+        <button @click="closePopup">关闭</button>
+      </div>
+    </div>
+    <div class="subtitle">
+      服务子系统
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { onMounted, ref, nextTick } from 'vue';
+import { onMounted, ref, nextTick, watch } from 'vue';
 import * as echarts from 'echarts';
-import indexData from '../assets/ServiceIndex.json';
-import treeData from '../assets/service.json';
+import apiClient from '../api'; // 导入API客户端
+import treeData from '../assets/service.json'; // 树状图结构
 
-//数据处理
-const scores = ref(indexData.scores)
-const score = ref(scores.value[scores.value.length - 1])
-const level = ref('')
-// console.log(scores.value)
-const pieData = ref([indexData.V[indexData.V.length - 1],
-indexData.O[indexData.O.length - 1],
-indexData.R[indexData.R.length - 1],
-indexData.S[indexData.S.length - 1]
-]);
+// --- ECharts 图表实例 ---
+let scoreChart, pieChart, radarChart, horizontalBarChart, smallBarChart1, smallBarChart2, smallBarChart3, smallBarChart4, treeChart;
 
-// 新增横向柱状图的数据
-const horizontalBarData = ref([
-    { name: '构件层级深度', value: 1.55 },
-    { name: '创新产量', value: 2 },
-    { name: '产出数量', value: 7 },
-    { name: '流程整合能力', value: 3.27 },
-    { name: '风险响应时间', value: 2.05 }
-]);
+// --- 数据和工具函数定义 ---
+const levelToScore = (level) => {
+  const mapping = { '差': 20, '较差': 40, '中等': 60, '良好': 80, '优秀': 95 };
+  return mapping[level] || 0;
+};
 
-// VORS趋势数据
-const smallBarData1 = ref(indexData.V);
-const smallBarData2 = ref(indexData.O);
-const smallBarData3 = ref(indexData.R);
-const smallBarData4 = ref(indexData.S);
+const keyToName = {
+  "F_V11": "产出数量", "F_V12": "创新产量", "F_V21": "数据覆盖率", "F_V22": "流动效率",
+  "F_V31": "流程整合能力", "F_V32": "更新淘汰能力", "F_O11": "构件层级深度",
+  "F_R11": "风险响应时间", "F_R12": "风险响应成功率", "F_R13": "威胁侦测能力",
+  "F_S11": "请求响应能力", "F_S12": "服务请求活跃度"
+};
+const nameToKey = Object.fromEntries(Object.entries(keyToName).map(a => a.reverse()));
 
+// --- 响应式数据定义 ---
+const score = ref(0);
+const pieData = ref([]);
+const horizontalBarData = ref([]);
+const radarData = ref([]);
+const vorsTrendData = ref({ V: [], O: [], R: [], S: [] });
+const indicatorTrendsData = ref([]);
+const years = ref([]);
+const popupTitle = ref('');
+
+// --- ECharts 颜色和等级工具函数 ---
 function getColor(value) {
-    if (value >= 90) {
-        level.value = 'A';
-        return '#008000'; // 绿色
-    } else if (value >= 75 && value <= 89) {
-        level.value = 'B';
-        return '#0000FF'; // 蓝色
-    } else if (value >= 60 && value <= 74) {
-        level.value = 'C';
-        return '#FFFF00'; // 黄色
-    } else {
-        level.value = 'D';
-        return '#FF0000'; // 红色
-    }
+  if (value >= 90) return '#008000';
+  if (value >= 75) return '#0000FF';
+  if (value >= 60) return '#FFFF00';
+  return '#FF0000';
 }
 
 function getLevel(value) {
-    if (value >= 90) {
-        return 'A';
-    } else if (value >= 75 && value <= 89) {
-        return 'B';
-    } else if (value >= 60 && value <= 74) {
-        return 'C';
-    } else {
-        return 'D';
-    }
+  if (value >= 90) return 'A';
+  if (value >= 75) return 'B';
+  if (value >= 60) return 'C';
+  return 'D';
 }
 
-onMounted(() => {
+// --- 数据获取与处理 ---
+async function fetchData() {
+  try {
+    const [overallRes, radarRes, bottomIndicatorsRes, radarTrendRes, indicatorTrendsRes] = await Promise.all([
+      apiClient.get('/overall'),
+      apiClient.get('/radar'),
+      apiClient.get('/bottom-indicators'),
+      apiClient.get('/radar-trend'),
+      apiClient.get('/indicator-trends')
+    ]);
 
-    // 总体评价仪表盘
-    const scoreChart = echarts.init(document.getElementById('scoreChart'));
-    const scoreOption = {
-        tooltip: {
-            formatter: '得分 : {c}'
-        },
-        series: [
-            {
-                type: 'gauge',
-                radius: '80%',
-                progress: {
-                    show: true,
-                    roundCap: true, // 添加圆角效果
-                    itemStyle: {
-                        color: getColor(score.value),
-                    },
-                    width: 13
-                },
-                axisLine: {
-                    lineStyle: {
-                        width: 13,
-                    },
-                    roundCap: true, // 添加圆角效果
-                },
-                detail: {
-                    valueAnimation: true,
-                    formatter: getLevel(score.value),
-                    color: '#fff',
-                    offsetCenter: [0, '100%'] // 下移数值显示的位置
-                },
-                pointer: {
-                    itemStyle: {
-                        color: getColor(score.value) // 使用 getColor 函数设置指针颜色
-                    }
-                },
-                data: [
-                    {
-                        value: score.value,
-                        name: '综合评价'
-                    }
-                ],
-                title: {
-                    offsetCenter: [0, '70%'],
-                    color: '#fff',
-                    fontSize: 20
-                }
-            }
-        ]
-    };
-    scoreChart.setOption(scoreOption);
-    // 点击事件
-    scoreChart.on('click', (params) => {
-        // console.log(params);
-        showPopup(params.data.name);
-    });
+    if (overallRes.data && overallRes.data.serviceSystemEvaluation) {
+      score.value = levelToScore(overallRes.data.serviceSystemEvaluation);
+    }
 
-    // 饼状图
-    const pieChart = echarts.init(document.getElementById('pieChart'));
-    const pieOption = {
-        title: {
-            text: '维度贡献率',
-            left: 'center',
-            bottom: '0%',
-            textStyle: {
-                color: '#fff',
-                fontSize: 17
-            }
-        },
-        tooltip: {
-            trigger: 'item'
-        },
-        series: [
-            {
-                name: '数据',
-                type: 'pie',
-                radius: '70%',
-                center: ['50%', '45%'],
-                data: pieData.value.map((value, index) => ({
-                    value,
-                    name: ['V','O','R','S'][index]
-                })),
-                emphasis: {
-                    itemStyle: {
-                        shadowBlur: 10,
-                        shadowOffsetX: 0,
-                        shadowColor: 'rgba(0, 0, 0, 0.5)'
-                    }
-                }
-            }
-        ],
-    };
-    pieChart.setOption(pieOption);
+    if (radarRes.data && radarRes.data.serviceSystem) {
+      const serviceSystem = radarRes.data.serviceSystem;
+      const orderedKeys = ['活力', '组织力', '稳定性', '服务能力'];
+      radarData.value = orderedKeys.map(key => levelToScore(serviceSystem[key]));
+      pieData.value = [
+        { value: levelToScore(serviceSystem['活力']), name: 'V' },
+        { value: levelToScore(serviceSystem['组织力']), name: 'O' },
+        { value: levelToScore(serviceSystem['稳定性']), name: 'R' },
+        { value: levelToScore(serviceSystem['服务能力']), name: 'S' }
+      ];
+    }
 
-    // 雷达图
-    const radarChart = echarts.init(document.getElementById('radarChart'));
-    const radarOption = {
-        title: {
-            text: 'VORS雷达图',
-            left: 'center',
-            top: 0,
-            textStyle: {
-                color: '#fff'
-            }
-        },
-        tooltip: {
-            trigger: 'item'
-        },
-        radar: {
-            indicator: [
-                { name: 'S', max: 100 },
-                { name: 'V', max: 100 },
-                { name: 'R', max: 100 },
-                { name: 'O', max: 100 }
-            ],
-            radius: '70%',
-            center: ['50%', '55%'],
-            splitArea: {
-                show: false
-            },
-            axisNameGap: 3
-        },
-        series: [{
-            type: 'radar',
-            symbol: 'none',
-            areaStyle: {
-                color: 'rgba(255, 127, 80,1.0)'
-            },
-            lineStyle: {
-                color: 'rgba(255, 127, 80,1.0)'
-            },
-            data: [
-                {
-                    value: pieData.value,
-                    name: 'VORS'
-                }
-            ]
-        }],
-    };
-    radarChart.setOption(radarOption);
+    if (bottomIndicatorsRes.data && bottomIndicatorsRes.data.service) {
+      horizontalBarData.value = bottomIndicatorsRes.data.service.map(item => ({
+        name: keyToName[item.indicatorName] || item.indicatorName,
+        value: levelToScore(item.indicatorLevel)
+      })).reverse();
+    }
 
-    // 核心指标预警柱状图
-    const horizontalBarChart = echarts.init(document.getElementById('horizontalBarChart'));
-    const horizontalBarOption = {
-        title: {
-            text: '核心指标预警',
-            left: 'center',
-            top: 0,
-            textStyle: {
-                color: '#fff'
-            }
-        },
-        tooltip: {},
-        xAxis: {
-            type: 'value',
-            boundaryGap: [0, 0.01],
-            splitLine: { show: false },
-            axisLine: { show: true },
-        },
-        yAxis: {
-            type: 'category',
-            data: horizontalBarData.value.map(item => item.name)
-        },
-        series: [
-            {
-                type: 'bar',
-                data: horizontalBarData.value.map(item => item.value),
-                itemStyle: {
-                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                        { offset: 0, color: '#66ccff' }, // 浅蓝色
-                        { offset: 1, color: '#99ffcc' }  // 浅绿色
-                    ])
-                }
-            }
-        ],
-        grid: {
-            left: '30%',
-            top: '20%',
-            bottom: '20%',
-        },
-    };
-    horizontalBarChart.setOption(horizontalBarOption);
+    if (radarTrendRes.data && radarTrendRes.data.length > 0) {
+      const trends = radarTrendRes.data.reverse();
+      years.value = trends.map(item => new Date(item.entryTime).getFullYear());
+      vorsTrendData.value.V = trends.map(item => levelToScore(item.serviceSystem['活力']));
+      vorsTrendData.value.O = trends.map(item => levelToScore(item.serviceSystem['组织力']));
+      vorsTrendData.value.R = trends.map(item => levelToScore(item.serviceSystem['稳定性']));
+      vorsTrendData.value.S = trends.map(item => levelToScore(item.serviceSystem['服务能力']));
+    }
 
-    // VORS趋势图
-    const smallBarChart1 = echarts.init(document.getElementById('smallBarChart1'));
-    const smallBarChart2 = echarts.init(document.getElementById('smallBarChart2'));
-    const smallBarChart3 = echarts.init(document.getElementById('smallBarChart3'));
-    const smallBarChart4 = echarts.init(document.getElementById('smallBarChart4'));
+    if (indicatorTrendsRes.data && indicatorTrendsRes.data.length > 0) {
+      indicatorTrendsData.value = indicatorTrendsRes.data.reverse();
+    }
 
-    const smallBarOption = {
-        title: {
-            textStyle: {
-                color: 'rgba(223, 228, 234,1.0)'
-            },
-            left: 20,
-        },
-        tooltip: {},
-        xAxis: {
-            type: 'category',
-            data: ['2020', '2021', '2022', '2023', '2024'],
-        },
-        yAxis: {
-            type: 'value',
-            axisLabel: {
-                customValues: [0, 20, 40, 60, 80, 100]
-            },
-            axisLine: { show: true },
-            axisTick: { show: true },
-            splitLine: { show: false },
-            min: 0,
-            max: 100,
-        },
-        series: {
-            type: 'bar',
-            barWidth: 30,
-            itemStyle: {
-                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: '#66ccff' }, // 浅蓝色
-                    { offset: 1, color: '#99ffcc' }  // 浅绿色
-                ])
-            }
-        },
-        grid: {
-            left: 40,
-            top: 40,
-            bottom: 40,
-        },
-    };
+  } catch (error) {
+    console.error("数据加载失败:", error);
+  }
+}
 
-    smallBarChart1.setOption({
-        ...smallBarOption,
-        title: { ...smallBarOption.title, text: 'V' },
-        series: [{ ...smallBarOption.series, data: smallBarData1.value },
-        { type: 'line', data: smallBarData1.value }]
-    })
-    smallBarChart2.setOption({
-        ...smallBarOption,
-        title: { ...smallBarOption.title, text: 'O' },
-        series: [{ ...smallBarOption.series, data: smallBarData2.value },
-        { type: 'line', data: smallBarData2.value }]
-    })
-    smallBarChart3.setOption({
-        ...smallBarOption,
-        title: { ...smallBarOption.title, text: 'R' },
-        series: [{ ...smallBarOption.series, data: smallBarData3.value },
-        { type: 'line', data: smallBarData3.value }]
-    })
-    smallBarChart4.setOption({
-        ...smallBarOption,
-        title: { ...smallBarOption.title, text: 'S' },
-        series: [{ ...smallBarOption.series, data: smallBarData4.value },
-        { type: 'line', data: smallBarData4.value }]
-    })
+// --- 图表初始化与更新 ---
+function initCharts() {
+  scoreChart = echarts.init(document.getElementById('scoreChart'));
+  pieChart = echarts.init(document.getElementById('pieChart'));
+  radarChart = echarts.init(document.getElementById('radarChart'));
+  horizontalBarChart = echarts.init(document.getElementById('horizontalBarChart'));
+  smallBarChart1 = echarts.init(document.getElementById('smallBarChart1'));
+  smallBarChart2 = echarts.init(document.getElementById('smallBarChart2'));
+  smallBarChart3 = echarts.init(document.getElementById('smallBarChart3'));
+  smallBarChart4 = echarts.init(document.getElementById('smallBarChart4'));
+  treeChart = echarts.init(document.getElementById('treeChart'));
+  setupTreeChart();
+}
 
-    // 树状图
-    // const getTreeColor = (name) => {
+function updateCharts() {
+  const scoreOption = {
+    tooltip: { formatter: '得分 : {c}' },
+    series: [{
+      type: 'gauge', radius: '80%', progress: { show: true, roundCap: true, itemStyle: { color: getColor(score.value) }, width: 13 },
+      axisLine: { lineStyle: { width: 13 }, roundCap: true },
+      detail: { valueAnimation: true, formatter: getLevel(score.value), color: '#fff', offsetCenter: [0, '100%'] },
+      pointer: { itemStyle: { color: getColor(score.value) } },
+      data: [{ value: score.value, name: '综合评价' }],
+      title: { offsetCenter: [0, '70%'], color: '#fff', fontSize: 20 }
+    }]
+  };
+  scoreChart.setOption(scoreOption);
+  scoreChart.on('click', () => showPopup('综合评价'));
 
-    // }
-    const treeChart = echarts.init(document.getElementById('treeChart'));
-    const treeOption = {
-        tooltip: {
-            trigger: 'item',
-            triggerOn: 'mousemove'
-        },
-        series: [
-            {
-                type: 'tree',
-                data: [treeData],
-                top: '0%',
-                left: '17%',
-                symbolSize: 17,
-                symbol: 'circle',
-                itemStyle: {
-                    //color: GetTreeColor()
-                },
-                label: {
-                    position: 'left',
-                    fontSize: 15,
-                    color: '#fff'
-                },
-                leaves: {
-                    label: {
-                        position: 'right',
-                        verticalAlign: 'middle',
-                        align: 'left'
-                    }
-                },
-                emphasis: {
-                    focus: 'descendant'
-                },
-                expandAndCollapse: true,
-                animationDuration: 550,
-                animationDurationUpdate: 750,
-                lineStyle: {
-                    color: '#6bd1f9' // 添加此行，设置连线颜色为蓝色
-                }
-            }
-        ]
-    };
-    treeChart.setOption(treeOption);
-    // 点击事件
-    treeChart.on('click', (params) => {
-        if (!params.data.children) {
-            showPopup(params.data.name);
-        }
-    });
+  const pieOption = {
+    title: { text: '维度贡献率', left: 'center', bottom: '0%', textStyle: { color: '#fff', fontSize: 17 } },
+    tooltip: { trigger: 'item' },
+    series: [{ name: '数据', type: 'pie', radius: '70%', center: ['50%', '45%'], data: pieData.value, emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' } } }]
+  };
+  pieChart.setOption(pieOption);
+
+  const radarOption = {
+    title: { text: 'VORS雷达图', left: 'center', top: 0, textStyle: { color: '#fff' } },
+    tooltip: { trigger: 'item' },
+    radar: {
+      indicator: [{ name: 'V', max: 100 }, { name: 'O', max: 100 }, { name: 'R', max: 100 }, { name: 'S', max: 100 }],
+      radius: '70%', center: ['50%', '55%'], splitArea: { show: false }, axisNameGap: 3
+    },
+    series: [{ type: 'radar', symbol: 'none', areaStyle: { color: 'rgba(255, 127, 80,1.0)' }, lineStyle: { color: 'rgba(255, 127, 80,1.0)' }, data: [{ value: radarData.value, name: 'VORS' }] }]
+  };
+  radarChart.setOption(radarOption);
+
+  const horizontalBarOption = {
+    title: { text: '核心预警指标', left: 'center', top: 0, textStyle: { color: '#fff' } },
+    tooltip: {},
+    xAxis: { type: 'value', boundaryGap: [0, 0.01], splitLine: { show: false }, axisLine: { show: true } },
+    yAxis: { type: 'category', data: horizontalBarData.value.map(item => item.name), axisLabel: { interval: 0 } },
+    series: [{ type: 'bar', data: horizontalBarData.value.map(item => item.value), itemStyle: { color: new echarts.graphic.LinearGradient(1, 0, 0, 0, [{ offset: 0, color: '#ff4d4d' }, { offset: 1, color: '#ffc371' }]) } }],
+    grid: { left: '30%', top: '20%', bottom: '10%', right: '10%' },
+  };
+  horizontalBarChart.setOption(horizontalBarOption);
+
+  const smallBarOptionBase = {
+    title: { textStyle: { color: 'rgba(223, 228, 234,1.0)' }, left: 20 },
+    tooltip: {},
+    xAxis: { type: 'category', data: years.value },
+    yAxis: { type: 'value', axisLine: { show: true }, axisTick: { show: true }, splitLine: { show: false }, min: 0, max: 100 },
+    series: [{ type: 'bar', barWidth: 30, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#66ccff' }, { offset: 1, color: '#99ffcc' }]) } }, { type: 'line' }],
+    grid: { left: 40, top: 40, bottom: 40, right: 20 },
+  };
+  smallBarChart1.setOption({ ...smallBarOptionBase, title: { ...smallBarOptionBase.title, text: 'V' }, series: [{ ...smallBarOptionBase.series[0], data: vorsTrendData.value.V }, { ...smallBarOptionBase.series[1], data: vorsTrendData.value.V }] });
+  smallBarChart2.setOption({ ...smallBarOptionBase, title: { ...smallBarOptionBase.title, text: 'O' }, series: [{ ...smallBarOptionBase.series[0], data: vorsTrendData.value.O }, { ...smallBarOptionBase.series[1], data: vorsTrendData.value.O }] });
+  smallBarChart3.setOption({ ...smallBarOptionBase, title: { ...smallBarOptionBase.title, text: 'R' }, series: [{ ...smallBarOptionBase.series[0], data: vorsTrendData.value.R }, { ...smallBarOptionBase.series[1], data: vorsTrendData.value.R }] });
+  smallBarChart4.setOption({ ...smallBarOptionBase, title: { ...smallBarOptionBase.title, text: 'S' }, series: [{ ...smallBarOptionBase.series[0], data: vorsTrendData.value.S }, { ...smallBarOptionBase.series[1], data: vorsTrendData.value.S }] });
+}
+
+function setupTreeChart() {
+  treeChart.setOption({
+    tooltip: { trigger: 'item', triggerOn: 'mousemove' },
+    series: [{ type: 'tree', data: [treeData], top: '0%', left: '17%', symbolSize: 17, symbol: 'circle', label: { position: 'left', fontSize: 15, color: '#fff' }, leaves: { label: { position: 'right', verticalAlign: 'middle', align: 'left' } }, emphasis: { focus: 'descendant' }, expandAndCollapse: true, animationDuration: 550, animationDurationUpdate: 750, lineStyle: { color: '#6bd1f9' } }]
+  });
+  treeChart.on('click', (params) => {
+    if (!params.data.children) showPopup(params.data.name);
+  });
+}
+
+onMounted(async () => {
+  initCharts();
+  await fetchData();
+  updateCharts();
 });
 
+watch([score, pieData, horizontalBarData, radarData, vorsTrendData], () => {
+  if(scoreChart) updateCharts();
+}, { deep: true });
+
+// --- 弹窗逻辑 ---
 const barChartRef = ref(null);
 const isPopupVisible = ref(false);
 
 const showPopup = (name) => {
-    isPopupVisible.value = true;
+  popupTitle.value = name;
+  isPopupVisible.value = true;
+};
+const closePopup = () => { isPopupVisible.value = false; };
+
+watch(isPopupVisible, (visible) => {
+  if (visible) {
     nextTick(() => {
-        initBarChart(name);
+      let data, trendYears;
+      if (popupTitle.value === '综合评价') {
+        data = vorsTrendData.value.V.map((v, i) => (v + vorsTrendData.value.O[i] + vorsTrendData.value.R[i] + vorsTrendData.value.S[i]) / 4);
+        trendYears = years.value;
+      } else {
+        const indicatorKey = nameToKey[popupTitle.value];
+        if (!indicatorKey || indicatorTrendsData.value.length === 0) return;
+        trendYears = indicatorTrendsData.value.map(item => new Date(item.entryTime).getFullYear());
+        data = indicatorTrendsData.value.map(record => {
+          const foundIndicator = record.service.find(ind => ind.indicatorName === indicatorKey);
+          return foundIndicator ? foundIndicator.value : 0;
+        });
+      }
+      const barChart = echarts.init(barChartRef.value);
+      barChart.setOption({
+        title: { text: popupTitle.value + ' - 历年数据', left: 30, top: 10 }, tooltip: {},
+        xAxis: { type: 'category', data: trendYears }, yAxis: { type: 'value', axisLine: { show: true }, axisTick: { show: true } },
+        series: [{ data, type: 'bar', barWidth: 40 }, { data, type: 'line' }],
+        grid: { left: 70, top: 70, bottom: 40 }
+      });
     });
-};
-
-const initBarChart = (name) => {
-    // 从indexData的indexData中的index对象中获取name对应的数据
-    const year = indexData.year;
-    let data;
-    if(name==='综合评价'){
-        data = indexData.scores
-    }else{
-        data = indexData.index[name]
-    }
-    // console.log(data);
-    const barChart = echarts.init(barChartRef.value);
-    const barOption = {
-        title: {
-            text: name,
-            left: 30,
-            top: 0,
-        },
-        tooltip: {},
-        xAxis: {
-            type: 'category',
-            data: year,
-        },
-        yAxis: {
-            type: 'value',
-            axisLine: { show: true },
-            axisTick: { show: true }
-        },
-        series: [
-            {
-                data: data,
-                type: 'bar',
-                barWidth: 40
-            },
-            {
-                data: data,
-                type: 'line'
-            }
-        ],
-        grid: {
-            left: 70,
-            top: 70,
-            bottom: 40
-        },
-    };
-    barChart.setOption(barOption);
-};
-
-const closePopup = () => {
-    isPopupVisible.value = false;
-};
-
-
-
+  }
+});
 </script>
 
 <style scoped>

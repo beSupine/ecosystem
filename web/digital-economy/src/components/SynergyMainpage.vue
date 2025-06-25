@@ -31,10 +31,36 @@
 <script setup>
 import { onMounted, ref, nextTick } from 'vue';
 import * as echarts from 'echarts';
-import indexData from '../assets/SynergyIndex.json'
+//import indexData from '../assets/SynergyIndex.json'
 import treeData from '../assets/synergy.json'
 import router from '../router';
+// --- 数据和工具函数定义 ---
 
+// 将后端返回的评估等级（如“良好”）映射为图表需要的分数
+const levelToScore = (level) => {
+  const mapping = { '差': 20, '较差': 40, '中等': 60, '良好': 80, '优秀': 95 };
+  return mapping[level] || 0;
+};
+
+// 后端返回的指标key（如X_V11）到前端树状图显示名称（如产出数量）的映射
+// 这个映射关系是根据 `IndicatorEvaluationService.java` 和 `synergy.json` 的结构手动建立的
+const keyToName = {
+  "X_V11": "产出数量", "X_V12": "产出效率", "X_V13": "产出质量", "X_V14": "产出效益",
+  "X_V21": "数据覆盖率", "X_V22": "流动效率", "X_O11": "企业分布密度", "X_O21": "协同主体多样性",
+  "X_O31": "协同主体协作程度", "X_O32": "协同主体竞争程度", "X_R11": "核心企业留存率",
+  "X_R12": "合作关系稳定性指数", "X_R13": "价值链恢复效率", "X_S11": "协同数据完整性"
+};
+
+// 用于存储从API获取的数据的响应式变量
+const score = ref(0);
+const pieData = ref([]);
+const horizontalBarData = ref([]);
+const smallBarData1 = ref([]); // 活力趋势
+const smallBarData2 = ref([]); // 组织力趋势
+const smallBarData3 = ref([]); // 稳定性趋势
+const smallBarData4 = ref([]); // 服务能力趋势
+const indicatorTrendsData = ref([]); // 所有指标的历年趋势原始数据
+const years = ref([]); // 年份标签
 //数据处理
 const scores = ref(indexData.scores)
 const score = ref(scores.value[scores.value.length - 1])

@@ -20,4 +20,10 @@ public interface TrainingDataService {
     TrainingData updateTrainingData(Integer id, TrainingData trainingData);
     void deleteTrainingData(Integer id);
     DateRangeQueryResultDTO getDataByDateRange(LocalDateTime startDate, LocalDateTime endDate);
+    /**
+     * 根据ID查找训练数据
+     * @param id 记录ID
+     * @return 找到的TrainingData实体，否则返回null
+     */
+    TrainingData findById(Integer id);
 }

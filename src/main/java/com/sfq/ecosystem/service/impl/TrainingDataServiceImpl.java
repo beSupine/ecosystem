@@ -205,6 +205,10 @@ public class TrainingDataServiceImpl implements TrainingDataService {
         List<DateRangeQueryInfoDTO> records = trainingDataMapper.findByDateRange(startDate, endDate);
         return new DateRangeQueryResultDTO(totalCount, records);
     }
+    @Override
+    public TrainingData findById(Integer id) {
+        return trainingDataMapper.findById(id);
+    }
 
     // 辅助方法，用于创建Map
     private Map<String, String> createMap(String... keyValues) {

@@ -43,5 +43,10 @@ public interface TrainingDataMapper {
     int delete(@Param("id") Integer id);
     long countByDateRange(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
     List<DateRangeQueryInfoDTO> findByDateRange(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
-
+    /**
+     * 根据ID查找训练数据
+     * @param id 记录ID
+     * @return 找到的TrainingData实体
+     */
+    TrainingData findById(@Param("id") Integer id);
 }

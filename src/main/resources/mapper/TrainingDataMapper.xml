@@ -85,6 +85,10 @@
         SELECT * FROM training_data ORDER BY entry_time DESC LIMIT 1;
     </select>
 
+    <select id="findById" resultMap="TrainingDataResultMap" parameterType="java.lang.Integer">
+        SELECT * FROM training_data WHERE id = #{id}
+    </select>
+
     <!-- 接口一: 获取综合评价 (单个最新) -->
     <select id="findOverallEvaluation" resultType="java.util.Map">
         SELECT

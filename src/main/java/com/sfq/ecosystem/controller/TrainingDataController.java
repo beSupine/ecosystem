@@ -114,4 +114,18 @@ public class TrainingDataController {
         DateRangeQueryResultDTO result = trainingDataService.getDataByDateRange(startDate, endDate);
         return ResponseEntity.ok(result);
     }
+    /**
+     * 根据ID获取单条训练数据记录
+     * @param id 记录的ID
+     * @return 完整的TrainingData对象
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<TrainingData> getTrainingDataById(@PathVariable Integer id) {
+        TrainingData data = trainingDataService.findById(id);
+        if (data != null) {
+            return ResponseEntity.ok(data);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
 }
